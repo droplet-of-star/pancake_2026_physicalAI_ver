@@ -1,0 +1,16 @@
+Copyright (c) 2026 <著作権者名を記入>. All rights reserved.
+
+本ソフトウェアおよび付随する文書・設計データの著作権は上記著作権者に帰属します。
+著作権者の事前の書面による許諾なく、複製、改変、再配布、公衆送信、他のソフトウェアへの
+組み込み、その他一切の利用を行うことはできません。
+
+This software and the accompanying documentation and design data are the
+property of the copyright holder above. No permission is granted to use, copy,
+modify, merge, publish, distribute, sublicense, or otherwise exploit this
+software, in whole or in part, without the prior written consent of the
+copyright holder.
+
+---
+Third-party components used by or derived from in this project are listed in
+THIRD_PARTY_NOTICES.md together with their licenses (see LICENSES/). Those
+components remain under their own licenses; this notice does not apply to them.

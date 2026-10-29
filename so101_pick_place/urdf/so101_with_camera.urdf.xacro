@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<!--
+  SO-101 follower + 手首取付カメラ（OAK-D Pro）。
+
+  camera_link を camera_parent に固定接続する。camera_link は RGB センサの位置（前面中央のレンズ）に置き、
+  x 前・y 左・z 上。optical frame への回転は oak_camera ノードが static TF で配信する。
+  渡す origin は「camera_parent 原点から見た RGB レンズの位置・姿勢」（config/camera_mount.yaml）。
+-->
+<robot name="so101_follower" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="camera_parent" default="gripper_link"/>
+  <xacro:arg name="camera_xyz" default="0 0 0"/>
+  <xacro:arg name="camera_rpy" default="0 0 0"/>
+  <xacro:arg name="camera_name" default="camera"/>
+
+  <xacro:include filename="$(find so101_follower_description)/urdf/so101_follower.urdf.xacro"/>
+
+  <!-- OAK-D Pro 本体: 約 97 x 29.5 x 22.5 mm (W x H x D)。RGB レンズは前面中央。 -->
+  <joint name="$(arg camera_name)_joint" type="fixed">
+    <origin xyz="$(arg camera_xyz)" rpy="$(arg camera_rpy)"/>
+    <parent link="$(arg camera_parent)"/>
+    <child link="$(arg camera_name)_link"/>
+  </joint>
+  <link name="$(arg camera_name)_link">
+    <visual>
+      <origin xyz="-0.01125 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.0225 0.097 0.0295"/></geometry>
+      <material name="oak_dark"><color rgba="0.15 0.15 0.17 1.0"/></material>
+    </visual>
+    <collision>
+      <origin xyz="-0.01125 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.0225 0.097 0.0295"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.061"/>
+      <origin xyz="-0.01125 0 0"/>
+      <inertia ixx="5.3e-5" ixy="0" ixz="0" iyy="7.0e-6" izz="5.0e-5" iyz="0"/>
+    </inertial>
+  </link>
+</robot>

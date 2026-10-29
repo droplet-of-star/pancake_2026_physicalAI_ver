@@ -1,0 +1,30 @@
+{
+  "python.defaultInterpreterPath": "/usr/bin/python3",
+  "python.analysis.extraPaths": [
+    "/opt/ros/humble/lib/python3.10/site-packages",
+    "/opt/ros/humble/local/lib/python3.10/dist-packages",
+    "/home/jetson1/ros2_ws/install/so101_hw_interface/lib/python3.10/site-packages",
+    "${workspaceFolder}/so101_pick_place"
+  ],
+  "python.autoComplete.extraPaths": [
+    "/opt/ros/humble/lib/python3.10/site-packages",
+    "/opt/ros/humble/local/lib/python3.10/dist-packages"
+  ],
+  "files.associations": {
+    "*.launch.py": "python",
+    "*.urdf": "xml",
+    "*.xacro": "xml",
+    "*.srdf": "xml"
+  },
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.egg-info": true
+  },
+  "terminal.integrated.env.linux": {
+    "ROS_DISTRO": "humble"
+  },
+  "[python]": {
+    "editor.rulers": [99],
+    "editor.tabSize": 4
+  }
+}

@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+install/
+log/
+.pytest_cache/
+*.bag
+*.db3
+.vscode/*.log
+.cache/
+docs/images
+docs/video
+docs/logs
+CLAUDE.md
+docs/ライセンス確認_2026-10-24.md
+docs/最終課題（10_19 改訂版）.pdf

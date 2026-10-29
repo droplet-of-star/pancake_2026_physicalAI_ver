@@ -1,0 +1,128 @@
+# so101_pick_place 共通パラメータ
+# 実機確認後に値を更新する。安全のため dry_run は既定で true。
+
+object_detector:
+  ros__parameters:
+    image_topic: /camera/camera/color/image_raw
+    debug_image_topic: /so101_pick_place/debug_image
+    # 赤色は HSV の Hue が 0 付近と 180 付近に分かれるため 2 区間で抽出
+    hsv_lower1: [0, 120, 70]
+    hsv_upper1: [10, 255, 255]
+    hsv_lower2: [170, 120, 70]
+    hsv_upper2: [180, 255, 255]
+    min_area_px: 1500
+    morph_kernel_px: 5
+    process_scale: 0.5        # 検出処理を 640x360 で実行し、座標はフル解像度に戻す
+    border_margin_px: 8       # 円盤（内接円）が画面端に触れる検出は使わない
+    # 円の求め方は rim_edge（Hough 円 + 色整合。ラップ反射・大きな載せ物に強い、2026-10-26）→ 解けなければ rim_circle（赤輪郭の RANSAC 円）
+    disk_radius_px_min: 40            # 円半径の許容範囲（処理解像度の画素）。トレイ半径 75 mm は 0.36 m 先で約 100 px（640 幅）
+    disk_radius_px_max: 400
+    rim_ransac_iters: 150
+    rim_inlier_px: 4.0
+    handle_exclude_scale: 1.15        # 内接円をこの倍率に広げた外側を取っ手とみなす
+    handle_grasp_fraction: 0.6        # 円盤縁〜取っ手先端のうち把持点の位置（0=縁, 1=先端）
+    handle_min_area_px: 800
+    publish_debug: true
+
+object_pose_estimator:
+  ros__parameters:
+    depth_topic: /camera/camera/aligned_depth_to_color/image_raw
+    camera_info_topic: /camera/camera/color/camera_info
+    camera_frame: camera_color_optical_frame
+    base_frame: base_link
+    depth_scale: 0.001          # mm -> m (16UC1)
+    min_depth_m: 0.15
+    max_depth_m: 1.50
+    max_stamp_diff_s: 0.05      # pixel と depth の許容時刻差
+    # 3D 化は作業台平面方式: 物体の周囲の深度に平面を当て、画素の視線との交点を使う（無地の皿は表面深度が欠損・誤マッチするため）
+    plane_annulus_scale: 2.5    # 台面の平面は物体の周囲の広い範囲から（載せ物が縁からはみ出しても台が多数派になる）
+    plane_exclude_scale: 1.6    # 物体＋載せ物（円盤からはみ出す袋など）を除外する範囲
+    plane_stride: 4
+    plane_ransac_iters: 80
+    plane_inlier_m: 0.008
+    plane_min_points: 600       # 間引き後の点数。平面には十分
+    plane_update_period_s: 0.3  # 平面は 0.3 s ごとに再フィット（毎フレームだと 8 Hz に落ちる）
+    plane_min_inlier_ratio: 0.25
+    plane_max_rms_m: 0.012
+    plane_max_angle_deg: 80.0
+    plane_ring_depth_gate_m: 0.10  # リング内の深度中央値±10 cm の点だけで平面推定（床を除外）。候補は最多 inlier の 70% 以上から最も低い平面（plane_prefer_lowest）
+    filter_window: 15           # /object_point_base_filtered は直近15フレームの中央値（controller はこちらを使う）
+    object_height_m: 0.0        # 台の面から法線方向に持ち上げる量（把持点の高さは controller 側で加える）
+    base_z_min_m: -0.10         # base 系で物体高さの妥当範囲。床（約 -0.72 m）の赤い物は捨てる
+    base_z_max_m: 0.30
+    handle_height_m: 0.032      # 取っ手の板上面の台面からの高さ（CAD 30〜33 mm）。把持画素の視線をこの高さで切る
+    plate_height_m: 0.018       # トレイ中心の円は縁の上端（18 mm）。その高さで視線を切ってから台面に落とす（2026-10-26）
+
+load_detector:
+  ros__parameters:
+    image_topic: /camera/camera/color/image_raw
+    bbox_topic: /so101_pick_place/object_bbox
+    model: sweets_v2.pt              # 自前データ 115 枚で微調整した YOLOv8n、4 クラス（pancake / candy / cake / tray）。2026-10-26、検証 mAP50: pancake 0.995 / tray 0.995 / candy 0.37
+                                      # tray 枠は object_detector の円探索 ROI に使う。学習手順は README「載せ物検出モデルの学習」
+    model_dir: ~/.so101_models
+    trigger_labels: ['pancake', 'candy', 'cake']   # loaded と判定するラベル（学習モデルがこれらを円の内側に検出したとき）。空 = 何でも
+    conf: 0.08                   # 640x360 入力では確信度が低めに出るので下げる（トレイ自体の誤検出は tray クラス / max_box_frac で除く）
+    imgsz: 416                   # 416: GPU 約 40 ms/推論（CPU 約 0.6 s）。640 だと確信度は少し上がるが遅い
+    rate_hz: 4.0                 # GPU なら 1 推論 約 35 ms（CPU 版 venv のときは 1.0 程度に下げる）
+    inside_scale: 1.0            # 検出の中心が トレイ半径 × これ の内側なら「載っている」
+    max_box_frac: 0.98           # 枠の長辺がトレイ直径 × これ を超える検出はトレイ自体とみなす。パンケーキはトレイの 8 割を占めるので 0.7 では捨てられた（2026-10-26）。tray クラスがあるので緩くてよい
+    tray_conf: 0.3               # tray 枠として採用する確信度の下限
+    device: auto                 # auto: CUDA があれば GPU（~/.venvs/yolo-gpu）、無ければ CPU
+
+pick_place_controller:
+  ros__parameters:
+    dry_run: true               # true の間は関節指令を一切出さない（ログのみ）
+    base_frame: base_link
+    object_topic: /so101_pick_place/object_point_base_filtered
+    joint_commands_topic: /so101_follower/joint_commands
+    joint_states_topic: /so101_follower/joint_states
+    calib_file: ~/.so101_follower_calibration.yaml
+    shoulder_lift_min_deg: -10.0   # サーボ内部下限 -11° に余裕
+    shoulder_pan_max_deg: 64.0     # サーボ内部上限 +65° に余裕
+    # 観測姿勢 [pan, lift, elbow, wrist_flex, wrist_roll] deg。カメラ高さ 0.35 m、60° 見下ろし、光軸は土台前方 33 cm の台面
+    observation_pose_deg: [0.0, -8.0, -49.0, 92.0, -88.6]   # サーボ内部制限（肩 -11°〜）内で成立する姿勢。カメラ 0.36 m 高、70° 見下ろし、光軸は前方 36 cm
+    approach_offset_z_m: 0.10   # お皿中心の上方この高さに TCP を置く（STEP 5 はここで止まる）
+    approach_tilt_deg: 20.0     # 接近の傾き（鉛直→目標からロボット中心向き）の最小値
+    approach_tilt_max_deg: 50.0 # 解けないときはここまで傾きを増やす
+    pregrasp_distance_m: 0.06   # 上空待機点は接近方向に沿って手前 6 cm
+    handle_topic: /so101_pick_place/handle_point_base
+    grasp_height_m: 0.030       # 指先（TCP）の高さ（台面＋）。取っ手の板は台面から 30〜33 mm。2026-10-26: ユーザー指定で 1 cm 上げた（0.020 → 0.030、板の上端付近を挟む）
+    lift_height_m: 0.06         # 把持後の持ち上げ高さ（把持点基準）。高いと届かない
+    gripper_open_deg: 70.0      # 開き角（約 0.7 mm/deg → 70° で約 49 mm）。左右の余裕を増やすため 60 → 70（2026-10-26）
+    gripper_close_deg: 1.0      # 閉じ角。キャリブの 0° = 指が閉じた状態。取っ手（9 mm）で止まり、残りの偏差が把持力になる
+    gripper_time_s: 1.5
+    grasp_check_min_angle_deg: 3.0   # 閉じた後の角度がこれ未満なら空振り（板を挟むと約 8° で止まる）
+    grasp_check_min_load: 100.0      # 閉じた後の負荷（生値）がこれ未満なら空振り（挟むと約 200）
+    grasp_retries: 1                 # pick_place での把持やり直し回数
+    observe_pan_search_deg: [0.0, -30.0, 30.0]   # 観測姿勢で見えなければ肩旋回をこの順に振って探す（- = 後ろから見て左、+ = 右。FK で確認 2026-10-25）。前回見つかった向きを次回は最初に試す
+    observe_state_file: ~/.so101_pick_place_last_pan   # 前回トレイが見えた旋回角を覚える（再起動後も最初にその向きを見る）
+    observe_hint_time_s: 1.0     # 見切れヒント（画面端の赤）だけが続いたら 1 s でその側へ振る
+    observe_pan_gain: 1.5        # ヒントの画像内角度 × この倍率 を肩旋回の修正量にする（実測: 画像 21° のとき旋回 29° 必要）
+    observe_pan_max_deg: 60.0    # 探索の旋回範囲 ±
+    observe_max_tries: 5         # 1 回の観測で試す姿勢数
+    table_z_tolerance_m: 0.05    # 観測した高さが table_z_m ± これ を外れたら誤検出として捨てる（2026-10-25: 右側の床の赤い物を z=-0.72 で拾った）
+    handle_dist_min_m: 0.05      # 計測した取っ手点と中心の距離の妥当範囲 [m]。外れたら向きも信用せず観測し直す
+    handle_dist_max_m: 0.16
+    handle_grasp_radius_m: 0.108 # 把持点 = 中心 + この距離 × 計測した向き（CAD の板中央）。計測距離は高さの違いで 2〜3 cm ずれるため使わない（2026-10-26）
+    load_topic: /so101_pick_place/tray_load   # load_detector の判定（JSON）
+    load_confirm_s: 2.0          # 「載っている」がこの秒数続いたら開始
+    load_wait_timeout_s: 0.0     # 待ち時間の上限 [s]（0 = stop まで待つ）
+    load_max_age_s: 1.5          # これより古い判定は無効
+    require_load_before_grasp: true   # 把持の直前にも「載っている」でなければ掴み始めない（2026-10-26 ユーザー指定）
+    post_grasp_shift_xy: [0.0, -0.02]   # 把持後、持ち上げる前に奥へ 2 cm 水平移動（ユーザー指定 2026-10-25）
+    place_position_xyz: [0.05, -0.30, 0.04]    # 置き位置（把持点の絶対座標）: 正面から左 5 cm・奥 30 cm（+x = 後ろから見て左, -y = 奥）。z は台面高さで上書き（ユーザー指定 2026-10-25）
+    place_handle_axis_xy: [0.0, 1.0]           # 配置時の取っ手の向き（base、中心→取っ手）。[0,1] = 取っ手がお皿の手前（ロボット側）。符号まで合わせる（ユーザー指定 2026-10-25）
+    place_tilt_min_deg: 0.0                    # 置くときは工具軸を鉛直から試す（上空でロールしてもトレイが傾かない。左 5 cm・奥 30 cm は 0° で到達可）
+    ik_pos_tol_m: 0.005
+    ik_dir_tol_deg: 10.0        # 上方停止では接近方向の傾き 10° まで許容
+    table_z_m: 0.017            # 作業台の高さ（base_link 基準、実測 0.013〜0.020）。把持高さの基準。table_z_use_observed: false のときはこの固定値を使う
+    table_z_use_observed: true  # 観測した台面 z を使う（table_z_m ± table_z_warn_m の範囲内のとき）。机は場所で 1 cm 程度高さが違い、固定値だと可動爪が板の上を通り過ぎて空振りした（2026-10-26）
+    table_z_warn_m: 0.02        # 観測がこれ以上ずれたら固定値に戻す
+    min_tcp_clearance_m: 0.05   # TCP 目標が台面＋この高さ未満なら拒否
+    tcp_offset_m: 0.064         # gripper_link 原点から指先まで。交換後のグリッパ v10 の CAD: 固定爪先端 z=65.3 mm（標準 105 mm より 4 cm 短い）
+    tcp_lateral_m: 0.016        # 指の閉じ方向のオフセット（+ = 板を可動爪側に置く）。2026-10-26: 固定爪先端がまだ当たるため 0.008 → 0.016（板は固定爪内側面から約 29 mm、可動爪先端から約 20 mm）。履歴: -0.016 → -0.004 → 0.008
+    max_joint_speed_deg_s: 15.0
+    settle_time_s: 1.5
+    observe_time_s: 3.0
+    correction_iterations: 3    # 到達後、実測角との差を指令に上乗せする回数
+    correction_gain: 0.8

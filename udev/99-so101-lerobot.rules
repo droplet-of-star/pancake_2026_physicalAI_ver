@@ -1,0 +1,5 @@
+# SO-101 (Feetech bus, CH343 USB-serial 1a86:55d3) の固定デバイス名
+# follower: シリアル 5AB9068796 (2026-10-13 に /dev/ttyACM0 として接続・キャリブレーション成功)
+# leader  : シリアル 5AB9068794 (推定。未確認)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d3", ATTRS{serial}=="5AB9068796", SYMLINK+="usbserial_lerobot_follower", MODE="0666", GROUP="dialout"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d3", ATTRS{serial}=="5AB9068794", SYMLINK+="usbserial_lerobot_leader",   MODE="0666", GROUP="dialout"

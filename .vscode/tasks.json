@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "colcon build: so101_pick_place",
+      "type": "shell",
+      "command": "source /opt/ros/humble/setup.bash && cd ~/ros2_ws && colcon build --symlink-install --packages-select so101_pick_place && source install/setup.bash",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "colcon build: all",
+      "type": "shell",
+      "command": "source /opt/ros/humble/setup.bash && cd ~/ros2_ws && colcon build --symlink-install",
+      "problemMatcher": []
+    },
+    {
+      "label": "check env",
+      "type": "shell",
+      "command": "bash ${workspaceFolder}/scripts/check_env.sh",
+      "problemMatcher": []
+    },
+    {
+      "label": "launch: realsense (align_depth)",
+      "type": "shell",
+      "command": "source ${workspaceFolder}/scripts/setup_env.sh && ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true",
+      "problemMatcher": []
+    }
+  ]
+}
